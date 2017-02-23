@@ -1,0 +1,161 @@
+library(ggplot2)
+library(readr)
+library(MASS)
+library(dplyr)
+library(lars)
+library(moments)
+library(caret)
+library(corrplot)
+library(gbm)
+library(tidyr)
+library(rpart)
+
+setwd("C:/Users/Pengwei Zhu/Downloads/House Prices Kaggle")
+train_org <- read.csv("train.csv", header = TRUE)
+test_org <- read.csv("test.csv", header = TRUE)
+
+# create a sample vector of test values
+test.n <- sample(1:nrow(train_org), nrow(train_org)/3, replace = F)
+
+# test dataset
+test <- train_org[test.n,]
+
+# train dataset
+train <- train_org[-test.n,]
+str(train)
+str(test)
+summary(train)
+
+#ggplot(train, aes(y=SalePrice, x=GrLivArea))+geom_point()
+#Since most point are loated in the range from 0 to 4000#
+#train <- train[train$GrLivArea<=4000,]
+
+train$isTrain <- 1
+test$isTrain <- 0
+combined <- rbind(train,test)
+RMSE <- function(x,y){
+  a <- sqrt(sum((log(x)-log(y))^2)/length(y))
+  return(a)
+}
+
+#check missing value#
+Missing_indices <- sapply(combined, function(x)sum(is.na(x)))
+Missing_Summary <- data.frame(index = names(combined), Missing_Values = Missing_indices)
+Missing_Summary[Missing_Summary$Missing_Values > 0,]
+
+# few of the highly missing variables ( I personally never want to have such in models..let's see)
+# Alley
+levels(combined$Alley) <- c(levels(combined$Alley), "None")
+combined$Alley[is.na(combined$Alley)] <- "None"
+
+# MiscFeature
+levels(combined$MiscFeature) <- c(levels(combined$MiscFeature), "None")
+combined$MiscFeature[is.na(combined$MiscFeature)] <- "None"
+
+# Fence
+levels(combined$Fence) <- c(levels(combined$Fence), "None")
+combined$Fence[is.na(combined$Fence)] <- "None"
+
+# Pool
+levels(combined$PoolQC) <- c(levels(combined$PoolQC), "None")
+combined$PoolQC[is.na(combined$PoolQC)] <- "None"
+
+# Fireplace Qu
+levels(combined$FireplaceQu) <- c(levels(combined$FireplaceQu), "None")
+combined$FireplaceQu[is.na(combined$FireplaceQu)] <- "None"
+
+# Garage, I saw GarageType, GarageYrBlt, GarageFinish, GarageQual, GarageCond which have the same number of NAs. so I think they may all shows that there are no Garage
+ # Therefore, next I should do is to check whether the NAs with the same ID in different variables.
+title <- c("GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond")
+result <- c()
+for (i in 1:(length(title)-1)) {
+  if (identical(as.character(combined[is.na(combined[,title[i]]) ,title[i]]), as.character(combined[is.na(combined[,title[i+1]]), title[i+1]]))) {
+    result[i] <- paste(title[i], "equal", title[i+1], sep = " ")
+  }else {
+    result[i] <- paste(title[i], "not equal", title[i+1], sep = " ")
+  }
+}
+print(result)
+for(i in 1:length(title)){
+  if (is.integer(combined[,title[i]])){
+    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
+  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
+  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  }
+}
+
+# Masonry veneer, I saw MasVnrType, MasVnrArea which have the same number of NAs. so I think they may all shows that there are no Masonry veneer
+# Therefore, next I should do is to check whether the NAs with the same ID in different variables.
+title <- c("MasVnrArea", "MasVnrType")
+result <- c()
+for (i in 1:(length(title)-1)) {
+  if (identical(as.character(combined[is.na(combined[,title[i]]) ,title[i]]), as.character(combined[is.na(combined[,title[i+1]]), title[i+1]]))) {
+    result[i] <- paste(title[i], "equal", title[i+1], sep = " ")
+  }else {
+    result[i] <- paste(title[i], "not equal", title[i+1], sep = " ")
+  }
+}
+print(result)
+for(i in 1:length(title)){
+  if (is.integer(combined[,title[i]])){
+    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
+  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
+  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  }
+}
+
+# Basement, I saw that NA in BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2 means no basement, so I think they all shows that there are no Basement
+# Therefore, next I should do is to change NAs to None in order to reduce number of NAs.
+title <- c("BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2")
+for(i in 1:length(title)){
+  if (is.integer(combined[,title[i]])){
+    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
+  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
+  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  }
+}
+
+# LotFrontage, since NAs in LotFrontage means unknow, I will assign them with the mean of LotFrontage in order to reduce the effect of NAs in LotFrontage.
+combined$LotFrontage[which(is.na(combined$LotFrontage))] <- as.integer(mean(combined$LotFrontage,na.rm = T))
+# Electrical, NAs in Electrical means unknow. Since it is not a numeric variable and there is only one NA, I would like to remove this entry.
+combined <- combined[!is.na(combined$Electrical),]
+
+# check again to make sure there is no missing value
+Missing_indices <- sapply(combined, function(x)sum(is.na(x)))
+Missing_Summary <- data.frame(index = names(combined), Missing_Values = Missing_indices)
+Missing_Summary[Missing_Summary$Missing_Values > 0,]
+
+train <- combined[combined$isTrain==1,]
+test <- combined[combined$isTrain==0,]
+test$isTrain <- NULL
+train$isTrain <- NULL
+
+str(train)
+str(test)
+ #Random Forest
+library(randomForest)
+model <- randomForest(SalePrice ~., data = train, method = "anova",
+                      ntree = 300,
+                      mtry = 26,
+                      replace = F,
+                      nodesize = 1,
+                      importance = T)
+predict <- predict(model, test)
+RMSE1 <- RMSE(predict, test$SalePrice)
+RMSE1 <- round(RMSE2, digits = 3)
+plot1 <- predict-test$SalePrice
+
+#GBM
+model <- gbm(SalePrice ~., data = train, distribution = "laplace",
+             shrinkage = 0.05,
+             interaction.depth = 5,
+             bag.fraction = 0.66,
+             n.minobsinnode = 1,
+             cv.folds = 100,
+             keep.data = F,
+             verbose = F,
+             n.trees = 300)
+predict <- predict(model, test, n.trees = 300)
+RMSE2 <- RMSE(predict, test$SalePrice)
+RMSE2 <- round(RMSE3, digits = 3)
+plot2 <- predict-test$SalePrice
