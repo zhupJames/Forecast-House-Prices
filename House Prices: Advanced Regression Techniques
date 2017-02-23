@@ -188,7 +188,7 @@ model <- randomForest(SalePrice ~., data = train, method = "anova",
                       importance = T)
 predict <- predict(model, test)
 RMSE1 <- RMSE(predict, test$SalePrice)
-RMSE1 <- round(RMSE2, digits = 3)
+RMSE1 <- round(RMSE1, digits = 3)
 plot1 <- predict-test$SalePrice
 
 # GBM
@@ -203,7 +203,7 @@ model <- gbm(SalePrice ~., data = train, distribution = "laplace",
              n.trees = 300)
 predict <- predict(model, test, n.trees = 300)
 RMSE2 <- RMSE(predict, test$SalePrice)
-RMSE2 <- round(RMSE3, digits = 3)
+RMSE2 <- round(RMSE2, digits = 3)
 plot2 <- predict-test$SalePrice
 
 # Compare the two RMSE and choose the smallest one.
