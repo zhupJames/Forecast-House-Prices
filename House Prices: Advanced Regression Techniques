@@ -38,13 +38,13 @@ str(test)
 # forecasting accuracy of the model generated from train.
 
 # create a sample vector of test values
-test.n <- sample(1:nrow(train_org), nrow(train_org)/4, replace = F)
+testid <- sample(1:nrow(train_org), nrow(train_org)/4, replace = F)
 
 # test dataset
-test <- train_org[test.n,]
+test <- train_org[testid,]
 
 # train dataset
-train <- train_org[-test.n,]
+train <- train_org[-testid,]
 
 # After generating the dataset of train and test, we need to check the data frame again to make sure the data is correct.
 str(train)
@@ -56,8 +56,8 @@ summary(test)
 # the regression if we just leave NAs in the dataset.
 # Since both train and test have NAs, we have to combine them together and then we can clean the data in order to avoid the type of two
 # datasets are different which may cause R cannot do regression.
-train$isTrain <- 1
-test$isTrain <- 0
+train$train <- 1
+test$train <- 0
 combined <- rbind(train,test)
 
 # Here is the function of RMSE which we use this to check how good the model does.
@@ -166,10 +166,10 @@ Missing_Summary <- data.frame(index = names(combined), Missing_Values = Missing_
 Missing_Summary[Missing_Summary$Missing_Values > 0,]
 
 # wonderful! Now there is no NAs any more. We can seperate the data frame into train and test again.
-train <- combined[combined$isTrain==1,]
-test <- combined[combined$isTrain==0,]
-test$isTrain <- NULL
-train$isTrain <- NULL
+train <- combined[combined$train==1,]
+test <- combined[combined$train==0,]
+test$train <- NULL
+train$train <- NULL
 
 # change the data type to make sure they are match
 str(train)
