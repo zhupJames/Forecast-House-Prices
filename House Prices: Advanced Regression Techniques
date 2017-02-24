@@ -21,6 +21,7 @@ library(moments)
 library(caret)
 library(corrplot)
 library(gbm)
+library(randomForest)
 library(tidyr)
 library(rpart)
 
@@ -179,7 +180,6 @@ str(test)
 # compare the two RMSE and find out which one is the best.
 
 # Random Forest
-library(randomForest)
 model <- randomForest(SalePrice ~., data = train, method = "anova",
                       ntree = 300,
                       mtry = 26,
