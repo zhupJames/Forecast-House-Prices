@@ -15,6 +15,7 @@
 library(ggplot2)
 library(readr)
 library(MASS)
+library(plyr)
 library(dplyr)
 library(lars)
 library(moments)
@@ -192,16 +193,30 @@ RMSE1 <- round(RMSE1, digits = 3)
 plot1 <- predict-test$SalePrice
 
 # GBM
+
+fitControl <- trainControl(## 10-fold CV
+  method = "repeatedcv",
+  number = 10,
+  ## repeated ten times
+  repeats = 10)
+gbmFit1 <- train(SalePrice ~ ., data = train, 
+                 method = "gbm", 
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+gbmFit1
+
 model <- gbm(SalePrice ~., data = train, distribution = "laplace",
-             shrinkage = 0.05,
-             interaction.depth = 5,
-             bag.fraction = 0.66,
-             n.minobsinnode = 1,
-             cv.folds = 100,
+             shrinkage = 0.1,
+             interaction.depth = 3,
+             bag.fraction = 0.75,
+             n.minobsinnode = 10,
+             cv.folds = 10,
              keep.data = F,
              verbose = F,
-             n.trees = 300)
-predict <- predict(model, test, n.trees = 300)
+             n.trees = 150)
+predict <- predict(model, test, n.trees = 150)
 RMSE2 <- RMSE(predict, test$SalePrice)
 RMSE2 <- round(RMSE2, digits = 3)
 plot2 <- predict-test$SalePrice
