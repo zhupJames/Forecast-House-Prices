@@ -11,7 +11,6 @@
 
 # I use R to do this competition. I also do a Python version for practice.
 
-# These are all the packages that I use for this competition
 library(ggplot2)
 library(readr)
 library(MASS)
@@ -20,10 +19,8 @@ library(dplyr)
 library(lars)
 library(moments)
 library(caret)
-library(corrplot)
 library(gbm)
 library(randomForest)
-library(tidyr)
 library(rpart)
 
 # input the data. There are two csv documents. train.csv is for data trainning. test.csv is for data testing.
@@ -32,35 +29,12 @@ train_org <- read.csv("train.csv", header = TRUE)
 test_org <- read.csv("test.csv", header = TRUE)
 
 # check the type of the two data frame
-str(train)
-str(test)
+str(train_org)
+str(test_org)
 
 # We can see that train has one more variable than test. So I compare all the variables in train and test, and I find that SalePrice is
 # missing in test. Therefore, I need to separate train data into two parts, one for train and another for test which is for testing the
-# forecasting accuracy of the model generated from train.
-
-# create a sample vector of test values
-testid <- sample(1:nrow(train_org), nrow(train_org)/4, replace = F)
-
-# test dataset
-test <- train_org[testid,]
-
-# train dataset
-train <- train_org[-testid,]
-
-# After generating the dataset of train and test, we need to check the data frame again to make sure the data is correct.
-str(train)
-str(test)
-summary(train)
-summary(test)
-
-# After the summary, we saw there are a lot of NAs in the data frame. Then we need to clean the data since we will have trouble during
-# the regression if we just leave NAs in the dataset.
-# Since both train and test have NAs, we have to combine them together and then we can clean the data in order to avoid the type of two
-# datasets are different which may cause R cannot do regression.
-train$train <- 1
-test$train <- 0
-combined <- rbind(train,test)
+# forecasting accuracy of the model generated from train. However, the first thing is to clean the data.
 
 # Here is the function of RMSE which we use this to check how good the model does.
 RMSE <- function(x,y){
@@ -69,32 +43,32 @@ RMSE <- function(x,y){
 }
 
 # check missing value
-Missing_indices <- sapply(combined, function(x)sum(is.na(x)))
-Missing_Summary <- data.frame(index = names(combined), Missing_Values = Missing_indices)
+Missing_indices <- sapply(train_org, function(x)sum(is.na(x)))
+Missing_Summary <- data.frame(index = names(train_org), Missing_Values = Missing_indices)
 Missing_Summary[Missing_Summary$Missing_Values > 0,]
 
 # we can see there are a great number of NAs in some variables, and I find that some of NAs do not mean they are unknown but they mean
 # none. Therefore, we'd better change the values of these NAs to "none"
 
 # Alley
-levels(combined$Alley) <- c(levels(combined$Alley), "None")
-combined$Alley[is.na(combined$Alley)] <- "None"
+levels(train_org$Alley) <- c(levels(train_org$Alley), "None")
+train_org$Alley[is.na(train_org$Alley)] <- "None"
 
 # MiscFeature
-levels(combined$MiscFeature) <- c(levels(combined$MiscFeature), "None")
-combined$MiscFeature[is.na(combined$MiscFeature)] <- "None"
+levels(train_org$MiscFeature) <- c(levels(train_org$MiscFeature), "None")
+train_org$MiscFeature[is.na(train_org$MiscFeature)] <- "None"
 
 # Fence
-levels(combined$Fence) <- c(levels(combined$Fence), "None")
-combined$Fence[is.na(combined$Fence)] <- "None"
+levels(train_org$Fence) <- c(levels(train_org$Fence), "None")
+train_org$Fence[is.na(train_org$Fence)] <- "None"
 
 # Pool
-levels(combined$PoolQC) <- c(levels(combined$PoolQC), "None")
-combined$PoolQC[is.na(combined$PoolQC)] <- "None"
+levels(train_org$PoolQC) <- c(levels(train_org$PoolQC), "None")
+train_org$PoolQC[is.na(train_org$PoolQC)] <- "None"
 
 # Fireplace Qu
-levels(combined$FireplaceQu) <- c(levels(combined$FireplaceQu), "None")
-combined$FireplaceQu[is.na(combined$FireplaceQu)] <- "None"
+levels(train_org$FireplaceQu) <- c(levels(train_org$FireplaceQu), "None")
+train_org$FireplaceQu[is.na(train_org$FireplaceQu)] <- "None"
 
 # Garage, I saw GarageType, GarageYrBlt, GarageFinish, GarageQual, GarageCond which have the same number of NAs. So I think they may
 # relate to each other and they may all shows that there is no Garage.
@@ -105,7 +79,7 @@ combined$FireplaceQu[is.na(combined$FireplaceQu)] <- "None"
 title <- c("GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond")
 result <- c()
 for (i in 1:(length(title)-1)) {
-  if (identical(as.character(combined[is.na(combined[,title[i]]) ,title[i]]), as.character(combined[is.na(combined[,title[i+1]]),
+  if (identical(as.character(train_org[is.na(train_org[,title[i]]) ,title[i]]), as.character(train_org[is.na(train_org[,title[i+1]]),
                                                                                                     title[i+1]]))) {
     result[i] <- paste(title[i], "equal", title[i+1], sep = " ")
   }else {
@@ -116,10 +90,10 @@ print(result)
 
 # Since they all shows the same ID, we can change them all to "nonw"
 for(i in 1:length(title)){
-  if (is.integer(combined[,title[i]])){
-    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
-  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
-  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  if (is.integer(train_org[,title[i]])){
+    train_org[,title[i]][which(is.na(train_org[,title[i]]))] <- as.integer(0)
+  } else {levels(train_org[,title[i]]) <- c(levels(train_org[,title[i]]), "None")
+  train_org[,title[i]][is.na(train_org[,title[i]])] <- "None"
   }
 }
 
@@ -127,7 +101,7 @@ for(i in 1:length(title)){
 title <- c("MasVnrArea", "MasVnrType")
 result <- c()
 for (i in 1:(length(title)-1)) {
-  if (identical(as.character(combined[is.na(combined[,title[i]]) ,title[i]]), as.character(combined[is.na(combined[,title[i+1]]),
+  if (identical(as.character(train_org[is.na(train_org[,title[i]]) ,title[i]]), as.character(train_org[is.na(train_org[,title[i+1]]),
                                                                                                     title[i+1]]))) {
     result[i] <- paste(title[i], "equal", title[i+1], sep = " ")
   }else {
@@ -136,10 +110,10 @@ for (i in 1:(length(title)-1)) {
 }
 print(result)
 for(i in 1:length(title)){
-  if (is.integer(combined[,title[i]])){
-    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
-  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
-  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  if (is.integer(train_org[,title[i]])){
+    train_org[,title[i]][which(is.na(train_org[,title[i]]))] <- as.integer(0)
+  } else {levels(train_org[,title[i]]) <- c(levels(train_org[,title[i]]), "None")
+  train_org[,title[i]][is.na(train_org[,title[i]])] <- "None"
   }
 }
 
@@ -147,76 +121,117 @@ for(i in 1:length(title)){
 # may shows unfinished, but in "BsmtCond" may shows NA which means no basement.
 title <- c("BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2")
 for(i in 1:length(title)){
-  if (is.integer(combined[,title[i]])){
-    combined[,title[i]][which(is.na(combined[,title[i]]))] <- as.integer(0)
-  } else {levels(combined[,title[i]]) <- c(levels(combined[,title[i]]), "None")
-  combined[,title[i]][is.na(combined[,title[i]])] <- "None"
+  if (is.integer(train_org[,title[i]])){
+    train_org[,title[i]][which(is.na(train_org[,title[i]]))] <- as.integer(0)
+  } else {levels(train_org[,title[i]]) <- c(levels(train_org[,title[i]]), "None")
+  train_org[,title[i]][is.na(train_org[,title[i]])] <- "None"
   }
 }
 
 # LotFrontage, since NAs in LotFrontage means unknown, I will assign them with the mean of LotFrontage in order to reduce the effect of
 # NAs in LotFrontage.
-combined$LotFrontage[which(is.na(combined$LotFrontage))] <- mean(combined$LotFrontage,na.rm = T)
+train_org$LotFrontage[which(is.na(train_org$LotFrontage))] <- mean(train_org$LotFrontage,na.rm = T)
 
 # Electrical, NAs in Electrical means unknown. Since it is not a numeric variable and there is only one NA, I would like to remove this
 # entry.
-combined <- combined[!is.na(combined$Electrical),]
+train_org <- train_org[!is.na(train_org$Electrical),]
 
 # check again to make sure there is no missing value
-Missing_indices <- sapply(combined, function(x)sum(is.na(x)))
-Missing_Summary <- data.frame(index = names(combined), Missing_Values = Missing_indices)
+Missing_indices <- sapply(train_org, function(x)sum(is.na(x)))
+Missing_Summary <- data.frame(index = names(train_org), Missing_Values = Missing_indices)
 Missing_Summary[Missing_Summary$Missing_Values > 0,]
 
-# wonderful! Now there is no NAs any more. We can seperate the data frame into train and test again.
-train <- combined[combined$train==1,]
-test <- combined[combined$train==0,]
-test$train <- NULL
-train$train <- NULL
+# we should remove the other identifier variables since they do not show any features for the obs.
+# Otherwise, Month sold should be a factor since different month may different trend for trading house.
+train_org$MoSold <- as.factor(train_org$MoSold)
+train_control <- train_org[, -1]
 
-# change the data type to make sure they are match
+# Now we need to see the distribution of SalePrice
+ggplot(train_control,aes(SalePrice))+geom_histogram()
+
+# Since SalePrice is skewed, taking the log of the variable normalizes it.
+ggplot(train_control, aes(x=log(SalePrice+1))) + geom_histogram(col = 'white') + theme_light()
+
+# Since PCA works on numeric variables, we'll convert these categroical variables into
+# numeric variables. So we use dummy variables to transfer the categroical variables in to numeric variables.
+library(dummies)
+names <- names(train_control[sapply(train_control, is.factor)])
+train_dummies <- dummy.data.frame(train_control, names = names)
+str(train_dummies)
+
+# now we can separate train data into train and test.
+# create a sample vector of test values
+testid <- sample(1:nrow(train_dummies), nrow(train_dummies)/4, replace = F)
+
+# test dataset
+test <- train_dummies[testid,]
+
+# train dataset
+train <- train_dummies[-testid,]
+
+# After generating the dataset of train and test, we need to check the data frame again to make sure the data is correct.
 str(train)
 str(test)
+
+# Since we don't want the variables have no changes, so we remove the variables with 0 variance
+names <-  sapply(train, function(v) var(v)==0)
+train <- train[,!names]
+test <- test[, !names]
+
+# Find out the index of "SalePrice"
+index_SaleP <- which(colnames(train) == "SalePrice")
+
+# PCA
+# we normalize the variables to have standard deviation equals to
+# 1 since it will be good for graph.
+train_PCA <- prcomp(train[,-index_SaleP], scale. = T)
+names(train_PCA)
+var <- (train_PCA$sdev)**2
+prop_varex <- var/sum(var)
+plot(prop_varex, xlab = "Principal Component",
+     ylab = "Proportion of Variable Explained",
+     type = "b")
+plot(cumsum(prop_varex), xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained",
+     type = 'b')
+which(cumsum(prop_varex) == 1)
+
+# now we need to create new train data with PCA.
+train.data <- data.frame(SalePrice = train$SalePrice, train_PCA$x)
+
+# since we find out that the first 251 PCAs can explain 100%, so we just
+# use the first 251 PCAs with SalePrice variable
+train.data <- train.data[, 1:252]
+
+# we also need to transform test into PCAs
+test.data <- predict(train_PCA, newdata = test[, -index_SaleP])
+test.data <- as.data.frame(test.data)
+test.data <- test.data[, 1:251] # without SalePrice
 
 # now we are going to do forecasting. There are two methods I can use. One is random forest, another is GBM. I will do the both and
 # compare the two RMSE and find out which one is the best.
 
 # Random Forest
-model <- randomForest(SalePrice ~., data = train, method = "anova",
-                      ntree = 300,
-                      mtry = 26,
+model <- randomForest(SalePrice ~., data = train.data, method = "anova",
+                      ntree = 1000,
                       replace = F,
-                      nodesize = 1,
                       importance = T)
-predict <- predict(model, test)
+predict <- predict(model, test.data)
 RMSE1 <- RMSE(predict, test$SalePrice)
 RMSE1 <- round(RMSE1, digits = 3)
 plot1 <- predict-test$SalePrice
 
 # GBM
-
-fitControl <- trainControl(## 10-fold CV
-  method = "repeatedcv",
-  number = 10,
-  ## repeated ten times
-  repeats = 10)
-gbmFit1 <- train(SalePrice ~ ., data = train, 
-                 method = "gbm", 
-                 trControl = fitControl,
-                 ## This last option is actually one
-                 ## for gbm() that passes through
-                 verbose = FALSE)
-gbmFit1
-
-model <- gbm(SalePrice ~., data = train, distribution = "laplace",
+model <- gbm(SalePrice ~., data = train.data, distribution = "laplace",
              shrinkage = 0.1,
              interaction.depth = 3,
-             bag.fraction = 0.75,
+             bag.fraction = 0.5,
              n.minobsinnode = 10,
              cv.folds = 10,
              keep.data = F,
              verbose = F,
-             n.trees = 150)
-predict <- predict(model, test, n.trees = 150)
+             n.trees = 1000)
+predict <- predict(model, test.data, n.trees = 1000)
 RMSE2 <- RMSE(predict, test$SalePrice)
 RMSE2 <- round(RMSE2, digits = 3)
 plot2 <- predict-test$SalePrice
