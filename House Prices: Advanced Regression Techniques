@@ -128,13 +128,10 @@ for(i in 1:length(title)){
   }
 }
 
-# LotFrontage, since NAs in LotFrontage means unknown, I will assign them with the mean of LotFrontage in order to reduce the effect of
-# NAs in LotFrontage.
-train_org$LotFrontage[which(is.na(train_org$LotFrontage))] <- mean(train_org$LotFrontage,na.rm = T)
+# LotFrontage and Electrical, since NAs in LotFrontage means unknown, I will KNN to impute the NAs
 
-# Electrical, NAs in Electrical means unknown. Since it is not a numeric variable and there is only one NA, I would like to remove this
-# entry.
-train_org <- train_org[!is.na(train_org$Electrical),]
+library(DMwR)
+train_org <- knnImputation(train_org)
 
 # check again to make sure there is no missing value
 Missing_indices <- sapply(train_org, function(x)sum(is.na(x)))
