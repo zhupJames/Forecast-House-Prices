@@ -156,6 +156,9 @@ train$istrain <- NULL
 test$istrain <- NULL
 train$SalePrice <- train_org$SalePrice
 
+# cut-off outliers
+train <- rm.outlier(train, fill = T)
+
 # Find out the index of "SalePrice"
 index_SaleP <- which(colnames(train) == "SalePrice")
 
