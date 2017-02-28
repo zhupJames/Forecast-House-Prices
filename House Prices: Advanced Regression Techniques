@@ -175,6 +175,9 @@ names <-  sapply(train, function(v) var(v)==0)
 train <- train[,!names]
 test <- test[, !names]
 
+# cut-off outliers
+train <- rm.outlier(train, fill = T)
+
 # Find out the index of "SalePrice"
 index_SaleP <- which(colnames(train) == "SalePrice")
 
