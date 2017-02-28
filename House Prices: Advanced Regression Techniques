@@ -235,3 +235,4 @@ plot2 <- predict-test$SalePrice
 
 # Compare the two RMSE and choose the smallest one.
 RMSE1 > RMSE2
+# We find out that GBM has a smaller RMSE, so we will use GBM as the final model.
