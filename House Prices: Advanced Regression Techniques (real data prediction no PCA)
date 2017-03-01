@@ -26,6 +26,16 @@ train_org$istrain <- 1
 test_org$istrain <- 0
 
 combined <- rbind(train_org[, -81], test_org)
+combined <- combined[, -1]
+
+# Month sold and MSSubClass should be a factor since different month may different trend for trading house.
+combined$MoSold <- as.factor(combined$MoSold)
+combined$MSSubClass <- as.factor(combined$MSSubClass)
+
+num <- sapply(combined, function(x)!is.factor(x))
+name_num <- names(combined[, num])
+# remove year variables and istrain
+name_num <- name_num[c(-5,-6,-24,-34,-35)]
 
 # We can see that train has one more variable than test. So I compare all the variables in train and test, and I find that SalePrice is
 # missing in test. Therefore, I need to separate train data into two parts, one for train and another for test which is for testing the
@@ -135,8 +145,6 @@ Missing_Summary[Missing_Summary$Missing_Values > 0,]
 
 
 # we should remove the other identifier variables since they do not show any features for the obs.
-# Otherwise, Month sold should be a factor since different month may different trend for trading house.
-combined$MoSold <- as.factor(combined$MoSold)
 combined_control <- combined[, -1]
 
 # Change the variables into log transform
@@ -158,62 +166,30 @@ combined$EnclosedPorch <- log(combined$EnclosedPorch+1)
 combined$X3SsnPorch <- log(combined$X3SsnPorch+1)
 combined$ScreenPorch <- log(combined$ScreenPorch+1)
 
-# Since PCA works on numeric variables, we'll convert these categroical variables into
-# numeric variables. So we use dummy variables to transfer the categroical variables in to numeric variables.
+# we use dummy variables to transfer the categroical variables in to numeric variables.
 library(dummies)
-names <- names(combined[sapply(combined, is.factor)])
-combined_dummies <- dummy.data.frame(combined, names = names)
+name <- names(combined[sapply(combined, is.factor)])
+combined_dummies <- dummy.data.frame(combined, names = name)
 str(combined_dummies)
-
-# Since we don't want the variables have no changes, so we remove the variables with 0 variance
-names <-  sapply(combined_dummies, function(v) var(v)==0)
-summary(names)
-combined <- combined_dummies
 
 # now we need seperate test and train.
 train <- combined[combined$istrain == 1,]
 test <- combined[combined$istrain == 0,]
 train$istrain <- NULL
 test$istrain <- NULL
+
+# Since we don't want the variables have no changes, so we remove the variables with 0 variance
+train_num <- train[, name_num]
+train_num <-  train_num[,apply(train_num,2,var,na.rm = TRUE) != 0]
+train <- cbind(rm.outlier(train_num, fill = T),train[,!names(train) %in% name_num])
+
 train$SalePrice <- train_org$SalePrice
-
-# cut-off outliers
-train <- rm.outlier(train, fill = T)
-
-# Find out the index of "SalePrice"
-index_SaleP <- which(colnames(train) == "SalePrice")
-
-# PCA
-# we normalize the variables to have standard deviation equals to
-# 1 since it will be good for graph.
-train_PCA <- prcomp(train[,-index_SaleP], scale. = T)
-names(train_PCA)
-var <- (train_PCA$sdev)**2
-prop_varex <- var/sum(var)
-plot(prop_varex, xlab = "Principal Component",
-     ylab = "Proportion of Variable Explained",
-     type = "b")
-plot(cumsum(prop_varex), xlab = "Principal Component",
-     ylab = "Cumulative Proportion of Variance Explained",
-     type = 'b')
-
-# now we need to create new train data with PCA.
-train.data <- data.frame(SalePrice = train$SalePrice, train_PCA$x)
-
-# since we find out that the first 252 PCAs can explain 100%, so we just
-# use the first 252 PCAs with SalePrice variable
-train.data <- train.data[, 1:253]
-
-# we also need to transform test into PCAs
-test.data <- predict(train_PCA, newdata = test)
-test.data <- as.data.frame(test.data)
-test.data <- test.data[, 1:252] # without SalePrice
 
 # now we are going to do forecasting. There are two methods I can use. One is random forest, another is GBM. I will do the both and
 # compare the two RMSE and find out which one is the best.
 
 # GBM
-model <- gbm(log(SalePrice+1) ~., data = train.data, distribution = "laplace",
+model <- gbm(SalePrice ~., data = train, distribution = "laplace",
              shrinkage = 0.01,
              interaction.depth = 3,
              bag.fraction = 0.5,
@@ -222,5 +198,8 @@ model <- gbm(log(SalePrice+1) ~., data = train.data, distribution = "laplace",
              keep.data = F,
              verbose = F,
              n.trees = 5000)
-predict <- predict(model, test.data, n.trees = 5000)
-predict <- cbind(test_org$Id, exp(predict)-1)
+predict <- predict(model, test, n.trees = 5000)
+predict <- cbind(test_org$Id, predict)
+
+RMSE <- RMSE(predict[,2] , submission$SalePrice)
+RMSE <- round(RMSE, digits = 3)
