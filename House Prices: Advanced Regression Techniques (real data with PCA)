@@ -221,7 +221,7 @@ test.data <- test.data[, 1:n] # without SalePrice
 # compare the two RMSE and find out which one is the best.
 
 # GBM
-model <- gbm(log(SalePrice+1) ~., data = train.data, distribution = "laplace",
+model <- gbm(SalePrice ~., data = train.data, distribution = "laplace",
              shrinkage = 0.01,
              interaction.depth = 3,
              bag.fraction = 0.5,
@@ -231,4 +231,4 @@ model <- gbm(log(SalePrice+1) ~., data = train.data, distribution = "laplace",
              verbose = F,
              n.trees = 5000)
 predict <- predict(model, test.data, n.trees = 5000)
-predict <- cbind(test_org$Id, exp(predict)-1)
+predict <- cbind(test_org$Id, predict)
