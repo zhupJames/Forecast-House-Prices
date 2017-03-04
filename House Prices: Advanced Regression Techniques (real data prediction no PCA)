@@ -13,7 +13,7 @@ library(DMwR)
 library(outliers)
 
 # input the data. There are two csv documents. train.csv is for data trainning. test.csv is for data testing.
-setwd("C:/Users/Pengwei Zhu/Downloads/House Prices Kaggle")
+setwd("C:/Users/Pengwei Zhu/Downloads/Kaggle Competitions/House Prices Kaggle")
 train_org <- read.csv("train.csv", header = TRUE)
 test_org <- read.csv("test.csv", header = TRUE)
 submission <- read.csv("sample_submission.csv", header = TRUE)
@@ -31,11 +31,6 @@ combined <- combined[, -1]
 # Month sold and MSSubClass should be a factor since different month may different trend for trading house.
 combined$MoSold <- as.factor(combined$MoSold)
 combined$MSSubClass <- as.factor(combined$MSSubClass)
-
-num <- sapply(combined, function(x)!is.factor(x))
-name_num <- names(combined[, num])
-# remove year variables and istrain
-name_num <- name_num[c(-5,-6,-24,-34,-35)]
 
 # We can see that train has one more variable than test. So I compare all the variables in train and test, and I find that SalePrice is
 # missing in test. Therefore, I need to separate train data into two parts, one for train and another for test which is for testing the
@@ -168,22 +163,21 @@ combined$ScreenPorch <- log(combined$ScreenPorch+1)
 
 # we use dummy variables to transfer the categroical variables in to numeric variables.
 library(dummies)
-name <- names(combined[sapply(combined, is.factor)])
-combined_dummies <- dummy.data.frame(combined, names = name)
+name <- names(Filter(is.factor, combined))
+combined_dummies <- dummy.data.frame(combined, omit.constants = T)
 str(combined_dummies)
 
 # now we need seperate test and train.
-train <- combined[combined$istrain == 1,]
-test <- combined[combined$istrain == 0,]
+train <- combined_dummies[combined_dummies$istrain == 1,]
+test <- combined_dummies[combined_dummies$istrain == 0,]
 train$istrain <- NULL
 test$istrain <- NULL
 
 # Since we don't want the variables have no changes, so we remove the variables with 0 variance
-train_num <- train[, name_num]
-train_num <-  train_num[,apply(train_num,2,var,na.rm = TRUE) != 0]
-train <- cbind(rm.outlier(train_num, fill = T),train[,!names(train) %in% name_num])
+train <-  train[,apply(train,2,var,na.rm = TRUE) != 0]
 
 train$SalePrice <- train_org$SalePrice
+train$SalePrice <- log(train$SalePrice + 1)
 
 # now we are going to do forecasting. There are two methods I can use. One is random forest, another is GBM. I will do the both and
 # compare the two RMSE and find out which one is the best.
@@ -198,8 +192,8 @@ model <- gbm(SalePrice ~., data = train, distribution = "laplace",
              keep.data = F,
              verbose = F,
              n.trees = 5000)
-predict <- predict(model, test, n.trees = 5000)
-predict <- cbind(test_org$Id, predict)
+SalePrice <- predict(model, test, n.trees = 5000)
+SalePrice <- exp(SalePrice) - 1
+SalePrice <- cbind(test_org$Id, SalePrice)
 
-RMSE <- RMSE(predict[,2] , submission$SalePrice)
-RMSE <- round(RMSE, digits = 3)
+# This is the best method I did for forecasting, and the RMSE is 0.12211, and the score is in top 15% in the leaderboard.
