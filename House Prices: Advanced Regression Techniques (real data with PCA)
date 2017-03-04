@@ -13,10 +13,9 @@ library(DMwR)
 library(outliers)
 
 # input the data. There are two csv documents. train.csv is for data trainning. test.csv is for data testing.
-setwd("C:/Users/Pengwei Zhu/Downloads/House Prices Kaggle")
+setwd("~/House Prices Kaggle")
 train_org <- read.csv("train.csv", header = TRUE)
 test_org <- read.csv("test.csv", header = TRUE)
-submission <- read.csv("sample_submission.csv", header = TRUE)
 
 # check the type of the two data frame
 str(train_org)
